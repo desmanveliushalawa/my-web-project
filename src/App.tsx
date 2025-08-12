@@ -1,738 +1,357 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  MapPin, 
-  Phone, 
-  Clock, 
-  Users, 
-  Building, 
-  Calendar, 
-  Star,
+import React, { useEffect, useRef, useState } from "react";
+import {
+  MapPin,
+  Phone,
+  Clock,
+  Users,
+  Building,
+  Calendar,
   MessageCircle,
   ChevronRight,
   Mail,
-  Globe,
   Award,
   TrendingUp,
-  Shield,
   Zap,
-  Heart,
   Home,
   Image,
   FileText,
-  Settings
-} from 'lucide-react';
+  Settings,
+  X,
+  User,
+  CheckSquare,
+  Briefcase, // Ikon baru untuk UMKM
+} from "lucide-react";
 
-const App = () => {
-  const [activeSection, setActiveSection] = useState('home');
+/** =================================================================================================
+ * BAGIAN 1: TYPE & INTERFACES
+ * ================================================================================================= */
+interface StatCardProps { icon: React.ComponentType<{ className?: string }>; value: number | string; label: string; color?: string; }
+interface NewsItem { id: number; title: string; category: string; date: string; image: string; excerpt: string; fullContent: string; }
+interface NewsCardProps { news: NewsItem; onReadMore: (n: NewsItem) => void; }
+interface UmkmItem { id: number; name: string; owner: string; category: string; description: string; images: string[]; address: string; phone: string; whatsapp: string; hours: string; lat: number; lng: number; }
+interface UMKMCardProps { umkm: UmkmItem; }
+interface Service { name: string; icon: React.ComponentType<{ className?: string }>; color: string; }
+interface NewsModalProps { news: NewsItem; onClose: () => void; }
+interface JabatanCardProps { jabatan: string; nama: string; className?: string; }
+interface PotensiPekon { kategori: string; nilai: string; }
+interface DataPenduduk { wilayah: string; jiwa: number; laki: number; perempuan: number; kk: number; rumah: number; }
+interface InfoTableProps<T> { title: string; headers: (keyof T)[]; data: T[]; }
+
+
+/** =================================================================================================
+ * BAGIAN 2: HOOK & HELPER
+ * ================================================================================================= */
+const useIntersectionObserver = (options: IntersectionObserverInit) => { const containerRef = useRef<HTMLDivElement | null>(null); const [isVisible, setIsVisible] = useState(false); useEffect(() => { const el = containerRef.current; if (!el) return; const obs = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setIsVisible(true); obs.unobserve(entry.target); } }, options); obs.observe(el); return () => obs.disconnect(); }, [containerRef, options]); return [containerRef, isVisible] as const; };
+const getTokoStatus = (hoursString: string) => { if (!hoursString) return { status: "N/A", color: "bg-gray-700/20 text-gray-300" }; if (hoursString.toLowerCase() === "24 jam") { return { status: "Buka", color: "bg-green-700/20 text-green-300" }; } const normalized = hoursString.replace(/\s/g, ""); const parts = normalized.split("-"); if (parts.length !== 2) return { status: "N/A", color: "bg-gray-700/20 text-gray-300" }; const parseTime = (t: string) => { const delim = t.includes(".") ? "." : ":"; const [h, m = "0"] = t.split(delim); return { hour: Number(h), minute: Number(m) }; }; const { hour: oh, minute: om } = parseTime(parts[0]); const { hour: ch, minute: cm } = parseTime(parts[1]); const now = new Date(); const cur = now.getHours() * 60 + now.getMinutes(); const open = oh * 60 + om; const close = ch * 60 + cm; let isOpen = false; if (close <= open) { if (cur >= open || cur < close) isOpen = true; } else { if (cur >= open && cur < close) isOpen = true; } return isOpen ? { status: "Buka", color: "bg-green-700/20 text-green-300" } : { status: "Tutup", color: "bg-red-700/20 text-red-300" }; };
+
+
+/** =================================================================================================
+ * BAGIAN 3: MODAL COMPONENTS
+ * ================================================================================================= */
+const NewsModal = ({ news, onClose }: NewsModalProps) => { return ( <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4"> <div className="bg-slate-800 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-yellow-400/10 text-white"> <div className="relative"> <button onClick={onClose} className="absolute top-4 right-4 text-gray-300 hover:text-white p-2 rounded-full"> <X className="w-5 h-5" /> </button> <img src={news.image} alt={news.title} className="w-full h-56 object-cover rounded-t-2xl" /> </div> <div className="p-6"> <div className="flex items-center justify-between mb-4"> <span className="bg-yellow-500/10 text-yellow-400 px-3 py-1 rounded-full text-sm font-medium">{news.category}</span> <div className="flex items-center text-gray-400 text-sm"> <Calendar className="w-4 h-4 mr-2" /> {news.date} </div> </div> <h2 className="text-2xl font-semibold mb-4">{news.title}</h2> <div className="prose prose-invert text-gray-200 whitespace-pre-line">{news.fullContent}</div> </div> </div> </div> ); };
+
+
+/** =================================================================================================
+ * BAGIAN 4: CHILD COMPONENTS
+ * ================================================================================================= */
+const StatCard = ({ icon: Icon, value, label, color = "text-yellow-400" }: StatCardProps) => ( <div className="bg-slate-900/40 rounded-2xl p-5 border border-yellow-400/5"> <div className="flex items-center space-x-4"> <div className="p-3 rounded-lg bg-slate-800/40"> <Icon className={`w-7 h-7 ${color}`} /> </div> <div> <div className="text-2xl font-semibold text-white">{typeof value === "number" ? value.toLocaleString("id-ID") : value}</div> <div className="text-gray-300 text-sm">{label}</div> </div> </div> </div> );
+const NewsCard = ({ news, onReadMore }: NewsCardProps) => { return ( <div className="bg-slate-900/40 rounded-2xl overflow-hidden border border-yellow-400/5 flex flex-col"> <div className="relative h-44 overflow-hidden"> <img src={news.image} alt={news.title} className="w-full h-full object-cover" /> </div> <div className="p-4 flex flex-col flex-grow"> <div className="flex items-center text-gray-400 text-sm mb-2"> <Calendar className="w-4 h-4 mr-2" /> {news.date} </div> <h3 className="text-lg font-semibold text-white mb-2">{news.title}</h3> <p className="text-gray-300 text-sm flex-grow">{news.excerpt}</p> <div className="mt-4 flex items-center justify-between"> <button onClick={() => onReadMore(news)} className="text-yellow-400 font-medium hover:text-yellow-300 flex items-center"> Baca Selengkapnya <ChevronRight className="w-4 h-4 ml-1" /> </button> <span className="text-gray-400 text-xs">{news.category}</span> </div> </div> </div> ); };
+const UMKMCard = ({ umkm }: UMKMCardProps) => { const tokoStatus = getTokoStatus(umkm.hours); return ( <div className="bg-slate-900/40 rounded-2xl overflow-hidden border border-yellow-400/5 flex flex-col"> <div className="relative h-44 overflow-hidden"> <img src={umkm.images[0]} alt={umkm.name} className="w-full h-full object-cover" /> </div> <div className="p-4 flex flex-col flex-grow"> <div className="flex justify-between items-start mb-2"> <div> <h3 className="text-lg font-semibold text-white capitalize">{umkm.name.toLowerCase()}</h3> <span className="text-gray-300 text-sm">{umkm.category}</span> </div> </div> <div className="flex items-center text-gray-400 text-sm mb-3"> <User className="w-4 h-4 mr-2 text-yellow-400" /> Pemilik: {umkm.owner} </div> <p className="text-gray-300 text-sm mb-4 flex-grow">{umkm.description}</p> <div className="text-gray-300 text-sm space-y-2 mb-4"> <div className="flex items-start"> <MapPin className="w-4 h-4 mr-2 text-gray-400" /> {umkm.address} </div> <div className="flex items-center"> <Clock className="w-4 h-4 mr-2 text-gray-400" /> {umkm.hours} <span className={`ml-3 px-2 py-0.5 text-xs rounded-full font-medium ${tokoStatus.color}`}>{tokoStatus.status}</span> </div> </div> <div className="flex gap-2 mt-auto"> {umkm.whatsapp ? ( <a href={`https://wa.me/${umkm.whatsapp}`} target="_blank" rel="noreferrer" className="flex-1 bg-yellow-500 text-slate-900 py-2 rounded-xl text-center font-medium">WhatsApp</a> ) : ( <button disabled className="flex-1 bg-slate-700 text-gray-400 py-2 rounded-xl">WhatsApp</button> )} <a href={`https://www.google.com/maps/search/?api=1&query=${umkm.lat},${umkm.lng}`} target="_blank" rel="noreferrer" className="flex-1 border border-yellow-400/10 text-white py-2 rounded-xl text-center">Lokasi</a> </div> </div> </div> ); };
+const AnimatedSection: React.FC<{ children: React.ReactNode; id: string }> = ({ children, id }) => { const [ref, isVisible] = useIntersectionObserver({ threshold: 0.1 }); return ( <section ref={ref} id={id} className={`py-16 transition-all duration-700 ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}> <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">{children}</div> </section> ); };
+const JabatanCard = ({ jabatan, nama, className }: JabatanCardProps) => ( <div className={`bg-slate-800/60 rounded-xl p-4 text-center border border-yellow-400/10 ${className}`}> <p className="text-sm text-yellow-400 font-semibold uppercase tracking-wider">{jabatan}</p> <p className="text-lg text-white font-medium">{nama}</p> </div> );
+const InfoTable = <T extends object>({ title, headers, data }: InfoTableProps<T>) => (
+  <div>
+    <h3 className="text-2xl font-semibold text-white mb-4 text-center">{title}</h3>
+    <div className="overflow-x-auto rounded-lg border border-slate-700">
+      <table className="min-w-full divide-y divide-slate-700">
+        <thead className="bg-slate-800">
+          <tr>
+            {headers.map((header) => (
+              <th key={String(header)} scope="col" className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">
+                {String(header).replace(/([A-Z])/g, ' $1').trim()}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="bg-slate-900/50 divide-y divide-slate-800">
+          {data.map((row, rowIndex) => (
+            <tr key={rowIndex} className="hover:bg-slate-800/40">
+              {headers.map((header, colIndex) => (
+                <td key={`${String(header)}-${colIndex}`} className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                  {String(row[header])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+);
+
+
+/** =================================================================================================
+ * BAGIAN 5: KOMPONEN UTAMA (App)
+ * ================================================================================================= */
+const App: React.FC = () => {
+  // --- state utama ---
+  const [activeSection, setActiveSection] = useState("home");
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
+  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
+  const [showAllPhotos, setShowAllPhotos] = useState(false);
+  const [showAllNews, setShowAllNews] = useState(false);
 
-  // Sample data
-  const villageStats = {
-    population: 5420,
-    families: 1680,
-    umkm: 45,
-    area: 12.5
+  // --- data ---
+  const villageInfo = { name: "Pekon Payung", whatsapp: "6285142373305", email: "info@PekonPayung.go.id" };
+  const strukturOrganisasi = { kepalaPekon: { jabatan: "Kepala Pekon", nama: "Tabrani" }, bhp: { jabatan: "BHP", nama: "Khuproni" }, sekretaris: { jabatan: "Sekretaris", nama: "Sakrani" }, bendahara: { jabatan: "Bendahara", nama: "Setiawansyah" }, kaur: [ { jabatan: "Kaur Tata Usaha", nama: "Uswati" }, { jabatan: "Kaur Keuangan", nama: "Setiawansyah" }, { jabatan: "Kaur Perencanaan", nama: "Ariyansah" }, ], kasi: [ { jabatan: "Kasi Pemerintahan", nama: "Yunada Mahendra" }, { jabatan: "Kasi Kesra", nama: "Elyana" }, { jabatan: "Kasi Pelayanan", nama: "Rozenni" }, ], kadus: [ { jabatan: "Kadus Way Gelang", nama: "Selpiyana" }, { jabatan: "Kadus Payung", nama: "Pahrurrozi" }, { jabatan: "Kadus Proyek", nama: "Badri" }, { jabatan: "Kadus Timbul", nama: "Rizapalupi" }, ], };
+  const dataPotensi: PotensiPekon[] = [
+    { kategori: "Luas Wilayah", nilai: "2,800 ha" }, { kategori: "Jumlah KK", nilai: "397 KK" },
+    { kategori: "Jumlah Laki-Laki", nilai: "789 jiwa" }, { kategori: "Jumlah Perempuan", nilai: "735 jiwa" },
+    { kategori: "Luas Lahan Sawah", nilai: "60 ha" }, { kategori: "Luas Perkebunan", nilai: "800 ha" },
+    { kategori: "Luas Hutan", nilai: "1,890 ha" }, { kategori: "Lahan Kas Pekon", nilai: "50 ha" },
+  ];
+  const dataKependudukan: DataPenduduk[] = [
+    { wilayah: "Total Pekon", jiwa: 1524, laki: 789, perempuan: 735, kk: 397, rumah: 294 },
+    { wilayah: "Payung Induk", jiwa: 613, laki: 321, perempuan: 292, kk: 169, rumah: 116 },
+    { wilayah: "Dusun Timbul", jiwa: 551, laki: 272, perempuan: 279, kk: 142, rumah: 100 },
+    { wilayah: "Dusun Proyek", jiwa: 235, laki: 118, perempuan: 117, kk: 56, rumah: 52 },
+    { wilayah: "Dusun Way Gelang", jiwa: 125, laki: 78, perempuan: 47, kk: 30, rumah: 26 },
+  ];
+  // -- UPDATE STATS SESUAI PERMINTAAN --
+  const villageStats = { 
+    population: dataKependudukan.find(d => d.wilayah === "Total Pekon")?.jiwa || 0, 
+    umkm: 11 
   };
+  const news: NewsItem[] = [ { id: 1, title: "Wisata Cekdam Pekon Payung: Destinasi Alam Asri", category: "Wisata", date: "15 Juli 2025", image: "/Screenshot_20250803-065235.png", excerpt: "Bendungan Cekdam di Pekon Payung menjadi destinasi wisata alam yang ramai dikunjungi warga...", fullContent: `Tanggamus — Bendungan Cekdam yang terletak di Pekon Payung, Kecamatan Kota Agung Barat, Kabupaten Tanggamus, kini menjadi salah satu destinasi wisata alam yang ramai dikunjungi warga lokal maupun luar daerah. Keindahan alam sekitar, air yang jernih, serta suasana yang sejuk menjadikan lokasi ini tempat favorit untuk bersantai dan bermain air bersama keluarga.\n\nSetiap akhir pekan, pengunjung datang untuk menikmati aliran air yang tenang dan segar, sambil berenang atau sekadar duduk di tepian bendungan. Di sekitar lokasi, tersedia warung-warung kecil yang menjual makanan ringan, menambah kenyamanan wisatawan yang ingin berlama-lama menikmati suasana.\n\nMenariknya, musim buah seperti manggis dan durian turut menambah daya tarik wisata Cekdam. Pengunjung dapat membeli langsung dari pengepul lokal, sehingga wisata air berpadu dengan wisata agro. Meski belum tertata secara profesional, antusiasme masyarakat dan viralnya lokasi ini di media sosial membuat Cekdam Pekon Payung semakin dikenal dan berpotensi besar untuk dikembangkan sebagai wisata desa berbasis komunitas.`, }, { id: 2, title: "Festival Budaya Pekon Payung Sukses Digelar", category: "Budaya", date: "10 Juli 2025", image: "https://images.pexels.com/photos/1190298/pexels-photo-1190298.jpeg?auto=compress&cs=tinysrgb&w=400", excerpt: "Festival budaya tahunan menampilkan kesenian tradisional dan produk UMKM lokal.", fullContent: `Pekon Payung kembali menunjukkan kekayaan budayanya melalui "Festival Budaya Pekon Payung" yang sukses digelar akhir pekan lalu. Acara ini menarik ratusan pengunjung yang antusias menyaksikan berbagai pertunjukan seni tradisional, mulai dari tari-tarian daerah hingga musik khas Lampung.\n\nSelain pertunjukan seni, festival ini juga menjadi ajang bagi para pelaku UMKM lokal untuk memamerkan dan menjual produk unggulan mereka. Berbagai produk kerajinan tangan, kuliner khas, dan hasil pertanian organik menjadi daya tarik tersendiri bagi para pengunjung. Kepala Pekon menyatakan bahwa acara ini bertujuan untuk melestarikan budaya sekaligus menggerakkan roda perekonomian lokal.`, }, ];
+  const umkmList: UmkmItem[] = [ { id: 1, name: "Warung Resti", owner: "Resti", category: "Warung Klontong", description: "Menjual berbagai kebutuhan pokok dan jajanan harian.", images: ["WhatsApp Image 2025-08-07 at 19.58.31_4d04da97.jpg"], address: "Pekon Payung", phone: "085950282703", whatsapp: "6285950282703", hours: "05.00 - 20.00", lat: -5.466629, lng: 104.596183, }, { id: 2, name: "Warung Aprilia", owner: "Aprilia", category: "Warung Klontong & Sayur", description: "Menyediakan kebutuhan pokok, sayur-mayur segar, dan berbagai keperluan dapur lainnya.", images: ["WhatsApp Image 2025-08-07 at 19.58.31_f4176208.jpg"], address: "Pekon Payung", phone: "087701679388", whatsapp: "6287701679388", hours: "05.00 - 17.00", lat: -5.467319, lng: 104.596585, }, { id: 3, name: "Warung Andika", owner: "Aprizal", category: "Warung Klontong", description: "Menjual berbagai macam kebutuhan sehari-hari dan jajanan.", images: ["WhatsApp Image 2025-08-07 at 19.58.32_a485d9f2.jpg"], address: "Pekon Payung", phone: "085209292708", whatsapp: "6285209292708", hours: "06.00 - 12.00", lat: -5.467517, lng: 104.596572, }, { id: 4, name: "Warung Junaidi", owner: "Junaidi", category: "Warung Klontong", description: "Menyediakan kebutuhan pokok dan berbagai barang harian lainnya.", images: ["WhatsApp Image 2025-08-07 at 23.14.06_ad9a8bba.jpg"], address: "Pekon Payung", phone: "Tidak Ada", whatsapp: "", hours: "05.00 - 21.00", lat: -5.467518, lng: 104.596587, }, { id: 5, name: "Warung Efrizal", owner: "Efrizal", category: "Warung Klontong", description: "Menjual berbagai kebutuhan pokok dan harian.", images: ["WhatsApp Image 2025-08-07 at 23.19.41_99c647a1.jpg"], address: "Pekon Payung", phone: "085921746626", whatsapp: "6285921746626", hours: "05.00 - 21.00", lat: -5.467518, lng: 104.596587, }, { id: 6, name: "Warung Pina", owner: "Basariah", category: "Warung Klontong", description: "Menyediakan kebutuhan sehari-hari untuk warga sekitar.", images: ["WhatsApp Image 2025-08-07 at 23.19.41_175f5ea8.jpg"], address: "Pekon Payung", phone: "Tidak Ada", whatsapp: "", hours: "24 Jam", lat: -5.467518, lng: 104.596587, }, { id: 7, name: "WARUNG AURA", owner: "Aura", category: "Sembako", description: "Warung Aura merupakan usaha ritel yang menyediakan kebutuhan pokok sehari-hari bagi masyarakat sekitar.", images: ["/WhatsApp Image 2025-07-29 at 15.38.05_0d0b11db.jpg"], address: "Dusun I Payung", phone: "0821-7700-5518", whatsapp: "6282177005518", hours: "07:00 - 22:00", lat: -5.463556, lng: 104.592581, }, { id: 8, name: "Warung Azwar", owner: "Azwar", category: "Sembako", description: "Menyediakan beragam produk kebutuhan rumah tangga dengan pelayanan yang ramah dan harga bersaing.", images: ["/WhatsApp Image 2025-07-29 at 15.49.44_01af0f2f.jpg"], address: "Dusun I Payung", phone: "0877-3014-0065", whatsapp: "6287730140065", hours: "07:00 - 22:00", lat: -5.468406, lng: 104.594477, }, { id: 9, name: "Warung Zaipul", owner: "Zaipul", category: "Sembako & Bensin", description: "Menjual berbagai jenis kebutuhan rumah tangga, bensin, gas LPG 3kg, Kartu Paket, dan lain-lain.", images: ["/WhatsApp Image 2025-07-29 at 16.11.10_2c4f8349.jpg"], address: "Dusun I Payung", phone: "0811-5206-0256", whatsapp: "6281152060256", hours: "07:00 - 22:00", lat: -5.465297, lng: 104.591567, }, { id: 10, name: "Warung Santy", owner: "Santy", category: "Sembako & Jajanan", description: "Menjual berbagai jenis sembako dan jajanan. Warung memiliki banyak pilihan produk dengan harga terjangkau.", images: ["/WhatsApp Image 2025-07-29 at 16.37.19_ab380f45.jpg"], address: "Dusun III Proyek", phone: "0877-1462-1073", whatsapp: "6287714621073", hours: "07:00 - 22:00", lat: -5.463556, lng: 104.592581, }, { id: 11, name: "Warung Pak RIO", owner: "Rio", category: "Sembako & Jajanan", description: "Menjual berbagai jenis sembako dan jajanan. Warung memiliki banyak pilihan produk dengan harga terjangkau.", images: ["/WhatsApp Image 2025-07-29 at 16.43.02_f444686e.jpg"], address: "Dusun III Proyek", phone: "0877-1462-1073", whatsapp: "6287714621073", hours: "07:00 - 22:00", lat: -5.47377, lng: 104.596301, }, ];
+  const services: Service[] = [ { name: "Surat Keterangan", icon: FileText, color: "text-yellow-400" }, { name: "Pelayanan KTP", icon: Users, color: "text-yellow-400" }, { name: "Administrasi Pekon", icon: Settings, color: "text-yellow-400" }, { name: "Pengaduan Online", icon: MessageCircle, color: "text-yellow-400" }, ];
+  const gallery = [ "IMG-20250802-WA0044.jpg", "IMG_1996.HEIC.jpg", "IMG_2096.HEIC.jpg", "IMG-20250802-WA0044.jpg", "IMG_1567.jpg", "IMG_1675.jpg", "IMG_1713.jpg", "IMG_1785.jpg", "IMG_1785.jpg", "IMG_1848.jpg", "IMG_1989.jpg", "WhatsApp Image 2025-07-28 at 13.14.51_2e0df539.jpg", "WhatsApp Image 2025-08-11 at 10.32.09_a8a95524.jpg", ];
 
-  const news = [
-    {
-      id: 1,
-      title: "Peluncuran Program Smart Village 2025",
-      category: "Teknologi",
-      date: "15 Januari 2025",
-      image: "https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=400",
-      excerpt: "Desa Maju meluncurkan program digitalisasi layanan publik untuk meningkatkan pelayanan kepada masyarakat."
-    },
-    {
-      id: 2,
-      title: "Festival Budaya Desa Maju Sukses Digelar",
-      category: "Budaya",
-      date: "10 Januari 2025",
-      image: "https://images.pexels.com/photos/1190298/pexels-photo-1190298.jpeg?auto=compress&cs=tinysrgb&w=400",
-      excerpt: "Festival budaya tahunan menampilkan kesenian tradisional dan produk UMKM lokal."
-    },
-    {
-      id: 3,
-      title: "Pembangunan Jalan Akses Baru Dimulai",
-      category: "Pembangunan",
-      date: "8 Januari 2025",
-      image: "https://images.pexels.com/photos/2219024/pexels-photo-2219024.jpeg?auto=compress&cs=tinysrgb&w=400",
-      excerpt: "Proyek jalan baru sepanjang 2km akan meningkatkan akses transportasi ke kawasan wisata."
-    }
-  ];
+  // --- HERO SLIDER ---
+  const heroImages = [gallery[0], gallery[1], gallery[2]];
+  const [heroIndex, setHeroIndex] = useState(0);
+  useEffect(() => { const id = setInterval(() => { setHeroIndex((p) => (p + 1) % heroImages.length); }, 5000); return () => clearInterval(id); }, [heroImages.length]);
 
-  const umkmList = [
-    {
-      id: 1,
-      name: "Warung Nasi Bu Sari",
-      category: "Kuliner",
-      image: "https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?auto=compress&cs=tinysrgb&w=400",
-      rating: 4.8,
-      phone: "628123456789",
-      location: "Jl. Raya Desa No. 15",
-      openTime: "06:00",
-      closeTime: "21:00",
-      description: "Warung nasi dengan menu tradisional dan modern"
-    },
-    {
-      id: 2,
-      name: "Toko Kerajinan Bambu Kreatif",
-      category: "Kerajinan",
-      image: "https://images.pexels.com/photos/3621104/pexels-photo-3621104.jpeg?auto=compress&cs=tinysrgb&w=400",
-      rating: 4.9,
-      phone: "628234567890",
-      location: "Jl. Kerajinan No. 8",
-      openTime: "08:00",
-      closeTime: "17:00",
-      description: "Kerajinan bambu berkualitas tinggi dan ramah lingkungan"
-    },
-    {
-      id: 3,
-      name: "Fresh Market Organik",
-      category: "Pertanian",
-      image: "https://images.pexels.com/photos/1300972/pexels-photo-1300972.jpeg?auto=compress&cs=tinysrgb&w=400",
-      rating: 4.7,
-      phone: "628345678901",
-      location: "Pasar Desa Blok A-5",
-      openTime: "05:00",
-      closeTime: "18:00",
-      description: "Sayuran organik segar langsung dari petani lokal"
-    },
-    {
-      id: 4,
-      name: "Kopi Robusta Desa",
-      category: "Minuman",
-      image: "https://images.pexels.com/photos/302899/pexels-photo-302899.jpeg?auto=compress&cs=tinysrgb&w=400",
-      rating: 4.9,
-      phone: "628456789012",
-      location: "Jl. Perkebunan No. 12",
-      openTime: "07:00",
-      closeTime: "22:00",
-      description: "Kopi robusta premium dengan cita rasa khas daerah"
-    }
-  ];
+  // --- NEWS CAROUSEL ---
+  useEffect(() => { const id = setInterval(() => { setCurrentNewsIndex((p) => (p + 1) % news.length); }, 7000); return () => clearInterval(id); }, [news.length]);
 
-  const services = [
-    { name: "Surat Keterangan", icon: FileText, color: "text-blue-500" },
-    { name: "Pelayanan KTP", icon: Users, color: "text-green-500" },
-    { name: "Administrasi Desa", icon: Settings, color: "text-purple-500" },
-    { name: "Pengaduan Online", icon: MessageCircle, color: "text-red-500" }
-  ];
-
-  const gallery = [
-    "https://images.pexels.com/photos/247600/pexels-photo-247600.jpeg?auto=compress&cs=tinysrgb&w=400",
-    "https://images.pexels.com/photos/1642125/pexels-photo-1642125.jpeg?auto=compress&cs=tinysrgb&w=400",
-    "https://images.pexels.com/photos/1933316/pexels-photo-1933316.jpeg?auto=compress&cs=tinysrgb&w=400",
-    "https://images.pexels.com/photos/2531709/pexels-photo-2531709.jpeg?auto=compress&cs=tinysrgb&w=400"
-  ];
-
-  // Auto-rotate news
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentNewsIndex((prevIndex) => (prevIndex + 1) % news.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, [news.length]);
-
-  const StatCard = ({ icon: Icon, value, label, color = "text-blue-400" }) => (
-    <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 group">
-      <div className="flex items-center space-x-4">
-        <div className={`p-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20 group-hover:scale-110 transition-transform duration-300`}>
-          <Icon className={`w-8 h-8 ${color}`} />
-        </div>
-        <div>
-          <div className="text-2xl font-bold text-white">{value.toLocaleString()}</div>
-          <div className="text-gray-300 text-sm">{label}</div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const NewsCard = ({ news: newsItem, isActive }) => (
-    <div className={`transition-all duration-500 ${isActive ? 'opacity-100 scale-100' : 'opacity-0 scale-95 absolute'}`}>
-      <div className="bg-white/10 backdrop-blur-md rounded-3xl overflow-hidden border border-white/20 hover:bg-white/15 transition-all duration-300 group">
-        <div className="relative h-48 overflow-hidden">
-          <img 
-            src={newsItem.image} 
-            alt={newsItem.title}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-          />
-          <div className="absolute top-4 left-4">
-            <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-3 py-1 rounded-full text-xs font-medium">
-              {newsItem.category}
-            </span>
-          </div>
-        </div>
-        <div className="p-6">
-          <div className="flex items-center text-gray-400 text-sm mb-2">
-            <Calendar className="w-4 h-4 mr-2" />
-            {newsItem.date}
-          </div>
-          <h3 className="text-xl font-bold text-white mb-3 group-hover:text-blue-300 transition-colors">
-            {newsItem.title}
-          </h3>
-          <p className="text-gray-300 leading-relaxed">{newsItem.excerpt}</p>
-          <button className="mt-4 flex items-center text-blue-400 hover:text-blue-300 transition-colors font-medium">
-            Baca Selengkapnya <ChevronRight className="w-4 h-4 ml-1" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  const UMKMCard = ({ umkm }) => (
-    <div className="bg-white/10 backdrop-blur-md rounded-3xl overflow-hidden border border-white/20 hover:bg-white/15 transition-all duration-300 group hover:scale-105">
-      <div className="relative h-48 overflow-hidden">
-        <img 
-          src={umkm.image} 
-          alt={umkm.name}
-          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-        />
-        <div className="absolute top-4 right-4">
-          <div className="bg-black/50 backdrop-blur-sm rounded-full px-3 py-1 flex items-center">
-            <Star className="w-4 h-4 text-yellow-400 mr-1 fill-current" />
-            <span className="text-white text-sm font-medium">{umkm.rating}</span>
-          </div>
-        </div>
-      </div>
-      
-      <div className="p-6">
-        <div className="flex justify-between items-start mb-3">
-          <div>
-            <h3 className="text-xl font-bold text-white mb-1">{umkm.name}</h3>
-            <span className="bg-gradient-to-r from-green-400 to-blue-400 text-white px-2 py-1 rounded-full text-xs font-medium">
-              {umkm.category}
-            </span>
-          </div>
-        </div>
-        
-        <p className="text-gray-300 text-sm mb-4">{umkm.description}</p>
-        
-        <div className="space-y-3 mb-4">
-          <div className="flex items-center text-gray-300 text-sm">
-            <MapPin className="w-4 h-4 mr-2 text-red-400" />
-            {umkm.location}
-          </div>
-          <div className="flex items-center text-gray-300 text-sm">
-            <Clock className="w-4 h-4 mr-2 text-green-400" />
-            {umkm.openTime} - {umkm.closeTime} WIB
-          </div>
-        </div>
-        
-        <div className="flex space-x-2">
-          <a 
-            href={`https://wa.me/${umkm.phone}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-2 rounded-xl font-medium hover:from-green-600 hover:to-green-700 transition-all duration-300 flex items-center justify-center group"
-          >
-            <MessageCircle className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-            WhatsApp
-          </a>
-          <button className="flex-1 bg-white/20 text-white px-4 py-2 rounded-xl font-medium hover:bg-white/30 transition-all duration-300 flex items-center justify-center group">
-            <MapPin className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform" />
-            Lokasi
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  // --- HANDLERS ---
+  const handleNav = (id: string) => { const el = document.getElementById(id); if (el) el.scrollIntoView({ behavior: "smooth" }); setActiveSection(id); };
+  const handleServiceRequestViaWhatsApp = (serviceName: string) => { const message = `Halo, saya ingin mengajukan layanan: *${serviceName}*. Mohon informasinya. Terima kasih.`; const whatsappUrl = `https://wa.me/${villageInfo.whatsapp}?text=${encodeURIComponent(message)}`; window.open(whatsappUrl, '_blank'); };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900">
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full z-50 bg-black/20 backdrop-blur-md border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                <Home className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-white font-bold text-xl">Desa Maju</span>
-            </div>
-            
-            <div className="hidden md:flex space-x-8">
-              {[
-                { id: 'home', label: 'Beranda' },
-                { id: 'news', label: 'Berita' },
-                { id: 'umkm', label: 'UMKM' },
-                { id: 'services', label: 'Layanan' },
-                { id: 'gallery', label: 'Galeri' },
-                { id: 'contact', label: 'Kontak' }
-              ].map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveSection(item.id)}
-                  className={`text-sm font-medium transition-colors duration-300 ${
-                    activeSection === item.id ? 'text-blue-400' : 'text-gray-300 hover:text-white'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </nav>
+    <>
+      <style>{`
+        .site-bg { background: linear-gradient(180deg, #0b1220 0%, #0f1724 100%); }
+        .hero-overlay { background: linear-gradient(180deg, rgba(2,6,23,0.55), rgba(2,6,23,0.75)); }
+        .card-hover:hover { transform: translateY(-6px); box-shadow: 0 12px 30px rgba(2,6,23,0.6); }
+      `}</style>
 
-      {/* Hero Section */}
-      {activeSection === 'home' && (
-        <section className="pt-20 pb-16">
+      <div className="min-h-screen text-white site-bg relative">
+        <nav className="fixed top-0 w-full z-50 bg-slate-900/60 backdrop-blur border-b border-yellow-400/5">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                Desa Maju
-              </h1>
-              <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto leading-relaxed">
-                Desa Inovatif dengan Teknologi Smart Village untuk Pelayanan Terbaik Masyarakat
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <button 
-                  onClick={() => setActiveSection('services')}
-                  className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-8 py-4 rounded-2xl font-medium hover:scale-105 transition-all duration-300 flex items-center justify-center group"
-                >
-                  <Zap className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-                  Layanan Digital
-                </button>
-                <button 
-                  onClick={() => setActiveSection('umkm')}
-                  className="bg-white/20 text-white px-8 py-4 rounded-2xl font-medium hover:bg-white/30 transition-all duration-300 flex items-center justify-center group"
-                >
-                  <Building className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-                  Explore UMKM
-                </button>
-              </div>
-            </div>
-
-            {/* Statistics */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-16">
-              <StatCard icon={Users} value={villageStats.population} label="Penduduk" color="text-blue-400" />
-              <StatCard icon={Home} value={villageStats.families} label="Kepala Keluarga" color="text-green-400" />
-              <StatCard icon={Building} value={villageStats.umkm} label="UMKM Aktif" color="text-purple-400" />
-              <StatCard icon={MapPin} value={villageStats.area} label="Luas (km²)" color="text-red-400" />
-            </div>
-
-            {/* Mission Vision */}
-            <div className="grid md:grid-cols-2 gap-8">
-              <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 hover:bg-white/15 transition-all duration-300">
-                <div className="flex items-center mb-6">
-                  <div className="p-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20">
-                    <TrendingUp className="w-8 h-8 text-blue-400" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-white ml-4">Visi</h3>
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center space-x-3">
+                <div className="w-9 h-9 bg-yellow-400 rounded-md flex items-center justify-center">
+                  <Home className="w-5 h-5 text-slate-900" />
                 </div>
-                <p className="text-gray-300 leading-relaxed">
-                  Menjadi desa mandiri, maju, dan sejahtera berbasis teknologi digital yang berpedoman pada nilai-nilai kearifan lokal dan pemberdayaan masyarakat berkelanjutan.
-                </p>
+                <span className="text-white font-semibold text-lg">{villageInfo.name}</span>
               </div>
-
-              <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20 hover:bg-white/15 transition-all duration-300">
-                <div className="flex items-center mb-6">
-                  <div className="p-3 rounded-xl bg-gradient-to-r from-green-500/20 to-blue-500/20">
-                    <Award className="w-8 h-8 text-green-400" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-white ml-4">Misi</h3>
-                </div>
-                <ul className="text-gray-300 leading-relaxed space-y-2">
-                  <li>• Mengembangkan pelayanan publik digital</li>
-                  <li>• Memberdayakan ekonomi lokal melalui UMKM</li>
-                  <li>• Melestarikan budaya dan kearifan lokal</li>
-                  <li>• Menciptakan lingkungan yang berkelanjutan</li>
-                </ul>
+              <div className="hidden md:flex space-x-2">
+                {[ { id: "home", label: "Beranda" }, { id: "news", label: "Berita" }, { id: "umkm", label: "UMKM" }, { id: "services", label: "Layanan" }, { id: "gallery", label: "Galeri" }, { id: "contact", label: "Kontak" }, ].map((item) => ( <button key={item.id} onClick={() => handleNav(item.id)} className={`px-4 py-2 rounded-lg text-sm font-medium transition ${activeSection === item.id ? "bg-yellow-500/10 text-yellow-300" : "text-gray-300 hover:text-white hover:bg-white/5"}`} > {item.label} </button> ))}
               </div>
             </div>
           </div>
-        </section>
-      )}
+        </nav>
 
-      {/* News Section */}
-      {activeSection === 'news' && (
-        <section className="pt-20 pb-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-                <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                  Berita Terkini
-                </span>
-              </h2>
-              <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-                Ikuti perkembangan terbaru dan kegiatan menarik di Desa Maju
-              </p>
-            </div>
-
-            {/* Featured News */}
-            <div className="relative h-96 mb-12">
-              {news.map((newsItem, index) => (
-                <NewsCard 
-                  key={newsItem.id} 
-                  news={newsItem} 
-                  isActive={index === currentNewsIndex} 
-                />
-              ))}
-              
-              {/* News Navigation */}
-              <div className="flex justify-center mt-8 space-x-3">
-                {news.map((_, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentNewsIndex(index)}
-                    className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                      index === currentNewsIndex ? 'bg-blue-400 scale-125' : 'bg-white/30 hover:bg-white/50'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* All News Grid */}
-            <div className="grid md:grid-cols-3 gap-6">
-              {news.map((newsItem) => (
-                <div key={newsItem.id} className="bg-white/10 backdrop-blur-md rounded-2xl overflow-hidden border border-white/20 hover:bg-white/15 transition-all duration-300 group">
-                  <div className="relative h-40 overflow-hidden">
-                    <img 
-                      src={newsItem.image} 
-                      alt={newsItem.title}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    />
-                    <div className="absolute top-3 left-3">
-                      <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-2 py-1 rounded-full text-xs font-medium">
-                        {newsItem.category}
-                      </span>
+        <main className="relative z-10">
+          <section id="home" className="pt-16">
+            <div className="relative">
+              <div className="w-full h-[550px] md:h-[500px] rounded-b-3xl overflow-hidden relative">
+                <img src={heroImages[0]} alt={`Hero 1`} className="w-full h-full object-cover transition-opacity duration-700" />
+                <div className="absolute inset-0 hero-overlay"></div>
+                <div className="absolute inset-0 flex items-center justify-center p-6">
+                  <div className="max-w-4xl text-center">
+                    <h1 className="text-4xl md:text-6xl font-extrabold text-white mb-4">{villageInfo.name}</h1>
+                    <p className="text-lg text-gray-300 max-w-2xl mx-auto mb-6"> Pekon Inovatif mendukung UMKM & pariwisata lokal untuk mempercepat pelayanan masyarakat. </p>
+                    <div className="flex gap-4 justify-center">
+                      <button onClick={() => handleNav("services")} className="bg-yellow-500 text-slate-900 px-6 py-3 rounded-xl font-semibold">Layanan Digital</button>
+                      <button onClick={() => handleNav("umkm")} className="bg-transparent border border-yellow-400 text-white px-6 py-3 rounded-xl">Jelajahi UMKM</button>
+                    </div>
+                    <div className="mt-6 flex items-center justify-center gap-2">
+                      {heroImages.map((_, i) => ( <button key={i} onClick={() => setHeroIndex(i)} className={`w-3 h-3 rounded-full ${i === heroIndex ? "bg-yellow-400" : "bg-white/30"}`} /> ))}
                     </div>
                   </div>
-                  <div className="p-4">
-                    <div className="flex items-center text-gray-400 text-xs mb-2">
-                      <Calendar className="w-3 h-3 mr-1" />
-                      {newsItem.date}
+                </div>
+              </div>
+            </div>
+
+            {/* PERUBAHAN BAGIAN STATS DI SINI */}
+            <div className="relative z-20 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 -mt-12">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <StatCard icon={Users} value={`${villageStats.population} Jiwa`} label="Jumlah Penduduk" />
+                <StatCard icon={Briefcase} value={villageStats.umkm} label="UMKM Aktif" />
+              </div>
+            </div>
+          </section>
+          
+          <section className="py-16">
+             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+               <div className="text-center mb-12">
+                 <h2 className="text-3xl md:text-4xl font-semibold text-white">Visi, Misi & Sambutan</h2>
+                 <p className="text-gray-300 mt-2">Mengenal lebih dekat arah dan tujuan Pekon Payung.</p>
+               </div>
+               <div className="grid md:grid-cols-2 gap-8 lg:gap-12 items-start">
+                 <div className="bg-slate-900/30 rounded-2xl p-6 border border-yellow-400/5">
+                   <div className="mb-6"> <h3 className="text-2xl font-semibold text-yellow-400 mb-3">Visi</h3> <p className="text-gray-300"> "Terwujudnya Pekon Payung yang Maju, Mandiri, Sejahtera, dan Berbudaya dengan Berlandaskan Iman dan Taqwa serta Pemanfaatan Teknologi." </p> </div>
+                   <div>
+                     <h3 className="text-2xl font-semibold text-yellow-400 mb-4">Misi</h3>
+                     <ul className="space-y-3 text-gray-300">
+                       <li className="flex items-start"> <CheckSquare className="w-5 h-5 mr-3 mt-1 text-yellow-500 flex-shrink-0" /> <span>Meningkatkan kualitas pelayanan publik yang cepat, mudah, dan transparan melalui digitalisasi layanan desa.</span> </li>
+                       <li className="flex items-start"> <CheckSquare className="w-5 h-5 mr-3 mt-1 text-yellow-500 flex-shrink-0" /> <span>Memberdayakan dan mengembangkan potensi UMKM lokal sebagai pilar utama ekonomi kerakyatan.</span> </li>
+                       <li className="flex items-start"> <CheckSquare className="w-5 h-5 mr-3 mt-1 text-yellow-500 flex-shrink-0" /> <span>Mengembangkan potensi pariwisata berbasis alam dan budaya lokal yang berkelanjutan dan dikelola oleh masyarakat.</span> </li>
+                       <li className="flex items-start"> <CheckSquare className="w-5 h-5 mr-3 mt-1 text-yellow-500 flex-shrink-0" /> <span>Meningkatkan kualitas sumber daya manusia melalui program pendidikan, pelatihan, dan kesehatan yang merata.</span> </li>
+                     </ul>
+                   </div>
+                 </div>
+                 <div className="bg-slate-900/30 rounded-2xl p-6 border border-yellow-400/5">
+                   <h3 className="text-2xl font-semibold text-white mb-3">Sambutan Kepala Pekon</h3>
+                   <p className="text-gray-300 mb-4"> Assalamualaikum Wr. Wb. </p>
+                   <p className="text-gray-300 mb-4"> Selamat datang di situs resmi Pekon Payung. Puji syukur kita panjatkan ke hadirat Tuhan Yang Maha Esa atas rahmat-Nya kita dapat membangun media komunikasi digital ini. Website ini kami hadirkan sebagai wujud komitmen kami dalam memberikan pelayanan yang transparan dan mendekatkan diri kepada masyarakat. </p>
+                   <p className="text-gray-300"> Kami berharap, melalui platform ini, segala informasi mengenai program pemerintah pekon, potensi desa, hingga produk unggulan UMKM dapat diakses dengan mudah oleh seluruh warga dan masyarakat luas. Mari bersama-sama kita bangun Pekon Payung menjadi desa yang lebih maju dan sejahtera. Terima kasih. </p>
+                   <p className="text-gray-300 mt-4"> Wassalamualaikum Wr. Wb. </p>
+                 </div>
+               </div>
+             </div>
+          </section>
+
+          <section className="py-16 bg-slate-900/20">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center mb-12"> <h2 className="text-3xl md:text-4xl font-semibold text-white">Struktur Organisasi</h2> <p className="text-gray-300 mt-2">Pemerintahan Pekon Payung, Kec. Kotaagung Barat</p> </div>
+              <div className="space-y-8">
+                <div className="flex justify-center gap-8 flex-wrap">
+                  <JabatanCard jabatan={strukturOrganisasi.kepalaPekon.jabatan} nama={strukturOrganisasi.kepalaPekon.nama} className="border-2 border-yellow-400" />
+                  <JabatanCard jabatan={strukturOrganisasi.bhp.jabatan} nama={strukturOrganisasi.bhp.nama} />
+                </div>
+                <div className="flex justify-center gap-8 flex-wrap">
+                  <JabatanCard jabatan={strukturOrganisasi.sekretaris.jabatan} nama={strukturOrganisasi.sekretaris.nama} />
+                  <JabatanCard jabatan={strukturOrganisasi.bendahara.jabatan} nama={strukturOrganisasi.bendahara.nama} />
+                </div>
+                <div className="grid md:grid-cols-2 gap-x-8 gap-y-12">
+                    <div className="space-y-4"> <h4 className="text-center text-xl font-semibold text-white">Kepala Seksi (Kasi)</h4> <div className="grid grid-cols-1 sm:grid-cols-3 gap-4"> {strukturOrganisasi.kasi.map(p => <JabatanCard key={p.nama} jabatan={p.jabatan} nama={p.nama} />)} </div> </div>
+                    <div className="space-y-4"> <h4 className="text-center text-xl font-semibold text-white">Kepala Urusan (Kaur)</h4> <div className="grid grid-cols-1 sm:grid-cols-3 gap-4"> {strukturOrganisasi.kaur.map(p => <JabatanCard key={p.nama} jabatan={p.jabatan} nama={p.nama} />)} </div> </div>
+                </div>
+                 <div className="space-y-4 pt-8">
+                    <h4 className="text-center text-xl font-semibold text-white">Kepala Dusun (Kadus)</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {strukturOrganisasi.kadus.map(p => <JabatanCard key={p.nama} jabatan={p.jabatan} nama={p.nama} />)}
                     </div>
-                    <h3 className="text-lg font-bold text-white mb-2 group-hover:text-blue-300 transition-colors">
-                      {newsItem.title}
-                    </h3>
-                    <p className="text-gray-300 text-sm">{newsItem.excerpt}</p>
-                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* UMKM Section */}
-      {activeSection === 'umkm' && (
-        <section className="pt-20 pb-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-                <span className="bg-gradient-to-r from-green-400 to-blue-400 bg-clip-text text-transparent">
-                  UMKM Desa Maju
-                </span>
-              </h2>
-              <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-                Dukung ekonomi lokal dengan berbelanja di UMKM terpercaya di desa kami
-              </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-2 gap-8">
-              {umkmList.map((umkm) => (
-                <UMKMCard key={umkm.id} umkm={umkm} />
-              ))}
-            </div>
-
-            {/* CTA Section */}
-            <div className="mt-16 text-center">
-              <div className="bg-gradient-to-r from-green-500/20 to-blue-500/20 backdrop-blur-md rounded-3xl p-8 border border-white/20">
-                <h3 className="text-2xl font-bold text-white mb-4">Ingin Bergabung dengan UMKM Kami?</h3>
-                <p className="text-gray-300 mb-6">Daftarkan usaha Anda dan jadilah bagian dari komunitas UMKM Desa Maju</p>
-                <button className="bg-gradient-to-r from-green-500 to-blue-500 text-white px-8 py-3 rounded-xl font-medium hover:scale-105 transition-all duration-300">
-                  Daftar UMKM
-                </button>
               </div>
             </div>
-          </div>
-        </section>
-      )}
-
-      {/* Services Section */}
-      {activeSection === 'services' && (
-        <section className="pt-20 pb-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-                <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  Layanan Digital
-                </span>
-              </h2>
-              <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-                Nikmati kemudahan layanan administrasi desa yang cepat dan efisien
-              </p>
+          </section>
+          
+          <section className="py-16">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
+              <InfoTable 
+                title="Data Potensi Pekon"
+                headers={['kategori', 'nilai']}
+                data={dataPotensi}
+              />
+              <InfoTable 
+                title="Data Kependudukan per Wilayah"
+                headers={['wilayah', 'jiwa', 'laki', 'perempuan', 'kk', 'rumah']}
+                data={dataKependudukan}
+              />
             </div>
+          </section>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-              {services.map((service, index) => (
-                <div key={index} className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:bg-white/15 transition-all duration-300 group text-center hover:scale-105">
-                  <div className="flex justify-center mb-4">
-                    <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-500/20 to-purple-500/20 group-hover:scale-110 transition-transform duration-300">
-                      <service.icon className={`w-8 h-8 ${service.color}`} />
+          <AnimatedSection id="news">
+            <div className="text-center mb-10"> <h2 className="text-3xl md:text-4xl font-semibold text-white">Berita Terkini</h2> <p className="text-gray-300 mt-2">Ikuti perkembangan terbaru dan kegiatan menarik di Pekon Payung</p> </div>
+            <div className="max-w-5xl mx-auto mb-8 relative">
+              <div className="h-72">
+                {news.length > 0 && (
+                  <div className="h-full">
+                    <div className="h-full rounded-2xl overflow-hidden border border-yellow-400/5 bg-slate-900/30">
+                      <div className="relative h-full flex">
+                        <div className="hidden md:block md:w-1/2 relative"> <img src={news[currentNewsIndex].image} alt={news[currentNewsIndex].title} className="w-full h-full object-cover" /> </div>
+                        <div className="p-6 md:w-1/2 flex flex-col justify-between">
+                          <div> <span className="inline-block bg-yellow-500/10 text-yellow-300 px-3 py-1 rounded-full text-sm">{news[currentNewsIndex].category}</span> <div className="text-gray-400 text-sm mt-2 flex items-center"><Calendar className="w-4 h-4 mr-2" />{news[currentNewsIndex].date}</div> <h3 className="text-2xl font-semibold text-white mt-4">{news[currentNewsIndex].title}</h3> <p className="text-gray-300 mt-3">{news[currentNewsIndex].excerpt}</p> </div>
+                          <div className="flex items-center justify-between mt-6">
+                            <div className="flex items-center gap-3"> {news.map((_, idx) => ( <button key={idx} onClick={() => setCurrentNewsIndex(idx)} className={`w-3 h-3 rounded-full ${idx === currentNewsIndex ? "bg-yellow-400" : "bg-white/30"}`} /> ))} </div>
+                            <div className="flex gap-3"> <button onClick={() => setSelectedNews(news[currentNewsIndex])} className="bg-yellow-500 text-slate-900 px-4 py-2 rounded-lg">Baca Selengkapnya</button> </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <h3 className="text-lg font-bold text-white mb-2">{service.name}</h3>
-                  <p className="text-gray-300 text-sm mb-4">Layanan cepat dan mudah</p>
-                  <button className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 rounded-xl font-medium hover:scale-105 transition-all duration-300 w-full">
-                    Akses Layanan
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Digital Transformation Info */}
-            <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20">
-              <div className="flex items-center mb-6">
-                <div className="p-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20">
-                  <Shield className="w-8 h-8 text-blue-400" />
-                </div>
-                <h3 className="text-2xl font-bold text-white ml-4">Transformasi Digital</h3>
-              </div>
-              <div className="grid md:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-400 mb-2">24/7</div>
-                  <div className="text-gray-300">Layanan Online</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-green-400 mb-2">5 Menit</div>
-                  <div className="text-gray-300">Proses Cepat</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-purple-400 mb-2">100%</div>
-                  <div className="text-gray-300">Paperless</div>
-                </div>
+                )}
               </div>
             </div>
-          </div>
-        </section>
-      )}
-
-      {/* Gallery Section */}
-      {activeSection === 'gallery' && (
-        <section className="pt-20 pb-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-                <span className="bg-gradient-to-r from-pink-400 to-red-400 bg-clip-text text-transparent">
-                  Galeri Desa
-                </span>
-              </h2>
-              <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-                Lihat keindahan dan aktivitas menarik di Desa Maju
-              </p>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center mb-6"> <h4 className="text-white font-semibold">Ringkasan Berita</h4> <div className="flex items-center gap-3"> <button onClick={() => setShowAllNews((s) => !s)} className="text-sm px-3 py-1 rounded-md border border-yellow-400/10 text-yellow-300"> {showAllNews ? "Tutup Daftar" : "Lihat Semua Berita"} </button> </div> </div>
+              {!showAllNews ? ( <div className="grid md:grid-cols-2 gap-6"> {news.map((n) => ( <NewsCard key={n.id} news={n} onReadMore={(item) => setSelectedNews(item)} /> ))} </div> ) : ( <div className="space-y-4"> {news.map((n) => ( <div key={n.id} className="bg-slate-900/40 rounded-lg p-4 flex items-start gap-4 border border-yellow-400/5 card-hover"> <img src={n.image} alt={n.title} className="w-28 h-20 object-cover rounded-md flex-shrink-0" /> <div className="flex-1"> <div className="flex justify-between items-start"> <div> <h5 className="text-white font-semibold">{n.title}</h5> <div className="text-gray-400 text-sm">{n.date} • {n.category}</div> </div> <div> <button onClick={() => setSelectedNews(n)} className="text-yellow-300 px-3 py-1 rounded-md border border-yellow-400/10">Baca</button> </div> </div> <p className="text-gray-300 mt-2 text-sm">{n.excerpt}</p> </div> </div> ))} </div> )}
             </div>
+          </AnimatedSection>
 
+          <AnimatedSection id="umkm">
+            <div className="text-center mb-8"> <h2 className="text-3xl font-semibold">UMKM Pekon Payung</h2> <p className="text-gray-300 mt-2">Dukung ekonomi lokal dengan berbelanja di UMKM terpercaya kami</p> </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"> {umkmList.map((u) => ( <UMKMCard key={u.id} umkm={u} /> ))} </div>
+            <div className="mt-10 text-center"> <div className="bg-slate-900/30 rounded-2xl p-6 border border-yellow-400/5"> <h3 className="text-lg font-semibold text-white">Ingin Bergabung dengan UMKM Kami?</h3> <p className="text-gray-300 mt-2">Daftarkan usaha Anda dan jadilah bagian dari komunitas UMKM Pekon Payung</p> <a href={`https://wa.me/${villageInfo.whatsapp}?text=${encodeURIComponent("Halo, saya tertarik untuk mendaftarkan UMKM saya.")}`} target="_blank" rel="noreferrer" className="inline-block mt-4 bg-yellow-500 text-slate-900 px-6 py-2 rounded-xl">Daftar UMKM via WhatsApp</a> </div> </div>
+          </AnimatedSection>
+
+          <AnimatedSection id="services">
+            <div className="text-center mb-8"> <h2 className="text-3xl font-semibold">Layanan Digital</h2> <p className="text-gray-300 mt-2">Nikmati kemudahan layanan administrasi Pekon yang cepat dan efisien</p> </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {gallery.map((image, index) => (
-                <div key={index} className="group relative overflow-hidden rounded-2xl aspect-square">
-                  <img 
-                    src={image} 
-                    alt={`Gallery ${index + 1}`}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <div className="absolute bottom-4 left-4 text-white">
-                      <Image className="w-6 h-6 mb-2" />
-                      <p className="text-sm font-medium">Foto Desa</p>
-                    </div>
-                  </div>
+              {services.map((s, idx) => (
+                <div key={idx} className="bg-slate-900/40 rounded-2xl p-6 border border-yellow-400/5 flex flex-col items-center text-center">
+                  <div className="p-3 rounded-lg bg-slate-800/20 mb-3">{React.createElement(s.icon, { className: `w-7 h-7 ${s.color}` })}</div>
+                  <h4 className="text-white font-medium mb-2">{s.name}</h4>
+                  <p className="text-gray-300 text-sm mb-4">Ajukan permohonan online</p>
+                  <button onClick={() => handleServiceRequestViaWhatsApp(s.name)} className="mt-auto bg-yellow-500 text-slate-900 px-4 py-2 rounded-lg"> Akses Layanan </button>
                 </div>
               ))}
             </div>
+          </AnimatedSection>
 
-            <div className="mt-12 text-center">
-              <button className="bg-gradient-to-r from-pink-500 to-red-500 text-white px-8 py-3 rounded-xl font-medium hover:scale-105 transition-all duration-300">
-                Lihat Semua Foto
-              </button>
+          <AnimatedSection id="gallery">
+            <div className="text-center mb-8"> <h2 className="text-3xl font-semibold">Galeri Pekon</h2> <p className="text-gray-300 mt-2">Lihat keindahan dan aktivitas menarik di Pekon Payung</p> </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {(showAllPhotos ? gallery : gallery.slice(0, 8)).map((img, idx) => ( <div key={idx} className="rounded-2xl overflow-hidden"> <img src={img} alt={`Galeri ${idx + 1}`} className="w-full h-56 object-cover" /> </div> ))}
             </div>
-          </div>
-        </section>
-      )}
+            {!showAllPhotos && gallery.length > 8 && ( <div className="mt-8 text-center"> <button onClick={() => setShowAllPhotos(true)} className="bg-yellow-500 text-slate-900 px-6 py-2 rounded-xl">Lihat Semua Foto</button> </div> )}
+          </AnimatedSection>
 
-      {/* Contact Section */}
-      {activeSection === 'contact' && (
-        <section className="pt-20 pb-16">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-                <span className="bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                  Hubungi Kami
-                </span>
-              </h2>
-              <p className="text-xl text-gray-300 max-w-2xl mx-auto">
-                Kami siap melayani dan mendengar aspirasi Anda
-              </p>
-            </div>
-
-            <div className="grid lg:grid-cols-2 gap-12">
-              {/* Contact Info */}
+          <AnimatedSection id="contact">
+            <div className="text-center mb-8"> <h2 className="text-3xl font-semibold">Hubungi Kami</h2> <p className="text-gray-300 mt-2">Kami siap melayani dan mendengar aspirasi Anda</p> </div>
+            <div className="grid lg:grid-cols-2 gap-8">
               <div className="space-y-6">
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
-                  <div className="flex items-center mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20">
-                      <MapPin className="w-6 h-6 text-blue-400" />
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="text-lg font-bold text-white">Alamat</h3>
-                      <p className="text-gray-300">Jl. Raya Desa Maju No. 1, Kecamatan Maju, Kabupaten Maju 12345</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
-                  <div className="flex items-center mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-r from-green-500/20 to-blue-500/20">
-                      <Phone className="w-6 h-6 text-green-400" />
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="text-lg font-bold text-white">Telepon</h3>
-                      <p className="text-gray-300">(021) 123-456-789</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
-                  <div className="flex items-center mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-r from-purple-500/20 to-pink-500/20">
-                      <Mail className="w-6 h-6 text-purple-400" />
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="text-lg font-bold text-white">Email</h3>
-                      <p className="text-gray-300">info@desamaju.go.id</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
-                  <div className="flex items-center mb-4">
-                    <div className="p-3 rounded-xl bg-gradient-to-r from-red-500/20 to-orange-500/20">
-                      <Globe className="w-6 h-6 text-red-400" />
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="text-lg font-bold text-white">Website</h3>
-                      <p className="text-gray-300">www.desamaju.go.id</p>
-                    </div>
-                  </div>
-                </div>
+                {[ { icon: MapPin, title: "Alamat", content: "Jl. Raya Pekon Payung No. 1, Kec. Kotaagung, Kab. Tanggamus" }, { icon: Phone, title: "Telepon", content: villageInfo.whatsapp }, { icon: Mail, title: "Email", content: villageInfo.email }, ].map((item, i) => ( <div key={i} className="bg-slate-900/40 rounded-2xl p-6 border border-yellow-400/5"> <div className="flex items-center"> <div className="p-3 rounded-lg bg-slate-800/20">{React.createElement(item.icon, { className: "w-6 h-6 text-yellow-400" })}</div> <div className="ml-4"> <h4 className="text-white font-medium">{item.title}</h4> <p className="text-gray-300 text-sm">{item.content}</p> </div> </div> </div> ))}
               </div>
-
-              {/* Contact Form */}
-              <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 border border-white/20">
-                <h3 className="text-2xl font-bold text-white mb-6">Kirim Pesan</h3>
-                <form className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Nama Lengkap</label>
-                    <input 
-                      type="text" 
-                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
-                      placeholder="Masukkan nama lengkap"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
-                    <input 
-                      type="email" 
-                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
-                      placeholder="nama@email.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Subjek</label>
-                    <input 
-                      type="text" 
-                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300"
-                      placeholder="Subjek pesan"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Pesan</label>
-                    <textarea 
-                      rows={5}
-                      className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-300 resize-none"
-                      placeholder="Tuliskan pesan Anda di sini..."
-                    />
-                  </div>
-                  <button 
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white py-3 rounded-xl font-medium hover:scale-105 transition-all duration-300 flex items-center justify-center group"
-                  >
-                    <MessageCircle className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" />
-                    Kirim Pesan
-                  </button>
+              <div className="bg-slate-900/40 rounded-3xl p-6 border border-yellow-400/5">
+                <h3 className="text-xl font-semibold text-white mb-4">Kirim Pesan</h3>
+                <form onSubmit={(e) => { e.preventDefault(); const form = e.target as HTMLFormElement; const fd = new FormData(form); const name = fd.get("name") as string; const email = fd.get("email") as string; const subject = fd.get("subject") as string; const message = fd.get("message") as string; const body = `Pesan dari: ${name} (${email})\n\n${message}`; window.location.href = `mailto:${villageInfo.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`; }} className="space-y-4" >
+                  <div> <label className="block text-sm text-gray-300 mb-1">Nama Lengkap</label> <input name="name" required className="w-full rounded-xl px-3 py-2 bg-slate-900 border border-slate-700 text-white" /> </div>
+                  <div> <label className="block text-sm text-gray-300 mb-1">Email</label> <input name="email" type="email" required className="w-full rounded-xl px-3 py-2 bg-slate-900 border border-slate-700 text-white" /> </div>
+                  <div> <label className="block text-sm text-gray-300 mb-1">Subjek</label> <input name="subject" required className="w-full rounded-xl px-3 py-2 bg-slate-900 border border-slate-700 text-white" /> </div>
+                  <div> <label className="block text-sm text-gray-300 mb-1">Pesan</label> <textarea name="message" rows={4} required className="w-full rounded-xl px-3 py-2 bg-slate-900 border border-slate-700 text-white" /> </div>
+                  <button type="submit" className="w-full bg-yellow-500 text-slate-900 py-2 rounded-xl">Kirim Pesan</button>
                 </form>
               </div>
             </div>
-          </div>
-        </section>
-      )}
+          </AnimatedSection>
 
-      {/* Footer */}
-      <footer className="bg-black/30 backdrop-blur-md border-t border-white/10 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                  <Home className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-white font-bold text-xl">Desa Maju</span>
-              </div>
-              <p className="text-gray-400 text-sm leading-relaxed">
-                Desa inovatif dengan teknologi smart village untuk pelayanan terbaik masyarakat.
-              </p>
+          <footer className="bg-slate-900/50 border-t border-yellow-400/5 py-10 mt-10">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-300">
+              <p>© {new Date().getFullYear()} KKNT Pekon Payung. All rights reserved.</p>
+              <p className="mt-2 text-sm">Tim: Desman, Nevin, Randy, Martin, Nata, Desi, Yunita, Discha, Aulia, Farel, Damar, Cantika</p>
             </div>
-            
-            <div>
-              <h4 className="text-white font-semibold mb-4">Layanan</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li>Administrasi Desa</li>
-                <li>Pelayanan KTP</li>
-                <li>Surat Keterangan</li>
-                <li>Pengaduan Online</li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="text-white font-semibold mb-4">Informasi</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li>Berita Desa</li>
-                <li>UMKM Lokal</li>
-                <li>Galeri Foto</li>
-                <li>Profil Desa</li>
-              </ul>
-            </div>
-            
-            <div>
-              <h4 className="text-white font-semibold mb-4">Kontak</h4>
-              <ul className="space-y-2 text-sm text-gray-400">
-                <li className="flex items-center">
-                  <Phone className="w-4 h-4 mr-2" />
-                  (021) 123-456-789
-                </li>
-                <li className="flex items-center">
-                  <Mail className="w-4 h-4 mr-2" />
-                  info@desamaju.go.id
-                </li>
-                <li className="flex items-center">
-                  <MapPin className="w-4 h-4 mr-2" />
-                  Desa Maju, Kab. Maju
-                </li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="border-t border-white/10 mt-8 pt-8 text-center">
-            <p className="text-gray-400 text-sm flex items-center justify-center">
-              Made with <Heart className="w-4 h-4 mx-1 text-red-400 fill-current" /> for Desa Maju © 2025
-            </p>
-          </div>
-        </div>
-      </footer>
-    </div>
+          </footer>
+        </main>
+
+        {selectedNews && <NewsModal news={selectedNews} onClose={() => setSelectedNews(null)} />}
+      </div>
+    </>
   );
 };
 
