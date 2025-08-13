@@ -195,35 +195,7 @@ const App: React.FC = () => {
             </div>
           </section>
           
-          <section className="py-16">
-             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-               <div className="text-center mb-12">
-                 <h2 className="text-3xl md:text-4xl font-semibold text-white">Visi, Misi & Sambutan</h2>
-                 <p className="text-gray-300 mt-2">Mengenal lebih dekat arah dan tujuan Pekon Payung.</p>
-               </div>
-               <div className="grid md:grid-cols-2 gap-8 lg:gap-12 items-start">
-                 <div className="bg-slate-900/30 rounded-2xl p-6 border border-yellow-400/5">
-                   <div className="mb-6"> <h3 className="text-2xl font-semibold text-yellow-400 mb-3">Visi</h3> <p className="text-gray-300"> "Terwujudnya Pekon Payung yang Maju, Mandiri, Sejahtera, dan Berbudaya dengan Berlandaskan Iman dan Taqwa serta Pemanfaatan Teknologi." </p> </div>
-                   <div>
-                     <h3 className="text-2xl font-semibold text-yellow-400 mb-4">Misi</h3>
-                     <ul className="space-y-3 text-gray-300">
-                       <li className="flex items-start"> <CheckSquare className="w-5 h-5 mr-3 mt-1 text-yellow-500 flex-shrink-0" /> <span>Meningkatkan kualitas pelayanan publik yang cepat, mudah, dan transparan melalui digitalisasi layanan desa.</span> </li>
-                       <li className="flex items-start"> <CheckSquare className="w-5 h-5 mr-3 mt-1 text-yellow-500 flex-shrink-0" /> <span>Memberdayakan dan mengembangkan potensi UMKM lokal sebagai pilar utama ekonomi kerakyatan.</span> </li>
-                       <li className="flex items-start"> <CheckSquare className="w-5 h-5 mr-3 mt-1 text-yellow-500 flex-shrink-0" /> <span>Mengembangkan potensi pariwisata berbasis alam dan budaya lokal yang berkelanjutan dan dikelola oleh masyarakat.</span> </li>
-                       <li className="flex items-start"> <CheckSquare className="w-5 h-5 mr-3 mt-1 text-yellow-500 flex-shrink-0" /> <span>Meningkatkan kualitas sumber daya manusia melalui program pendidikan, pelatihan, dan kesehatan yang merata.</span> </li>
-                     </ul>
-                   </div>
-                 </div>
-                 <div className="bg-slate-900/30 rounded-2xl p-6 border border-yellow-400/5">
-                   <h3 className="text-2xl font-semibold text-white mb-3">Sambutan Kepala Pekon</h3>
-                   <p className="text-gray-300 mb-4"> Assalamualaikum Wr. Wb. </p>
-                   <p className="text-gray-300 mb-4"> Selamat datang di situs resmi Pekon Payung. Puji syukur kita panjatkan ke hadirat Tuhan Yang Maha Esa atas rahmat-Nya kita dapat membangun media komunikasi digital ini. Website ini kami hadirkan sebagai wujud komitmen kami dalam memberikan pelayanan yang transparan dan mendekatkan diri kepada masyarakat. </p>
-                   <p className="text-gray-300"> Kami berharap, melalui platform ini, segala informasi mengenai program pemerintah pekon, potensi desa, hingga produk unggulan UMKM dapat diakses dengan mudah oleh seluruh warga dan masyarakat luas. Mari bersama-sama kita bangun Pekon Payung menjadi desa yang lebih maju dan sejahtera. Terima kasih. </p>
-                   <p className="text-gray-300 mt-4"> Wassalamualaikum Wr. Wb. </p>
-                 </div>
-               </div>
-             </div>
-          </section>
+         
 
           <section className="py-16 bg-slate-900/20">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
